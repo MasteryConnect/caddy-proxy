@@ -1,43 +1,56 @@
-{{ range $host, $containers := groupByMulti $ "Env.VIRTUAL_HOST" "," }}
-{{ $host }} {
-  {{ range $index, $value := $containers }}
-    {{ $basicauth := $value.Env.BASIC_AUTH }}
-    {{ if $basicauth }}
-        basicauth {{ $basicauth }}
-    {{ end }}
-    {{ $addrLen := len $value.Addresses }}
-    {{ if eq $addrLen 1 }}
-      {{ with $address := index $value.Addresses 0 }}
-      proxy / {{ $address.IP }}:{{ $address.Port }} {
+{{ $CurrentContainer := where $ "ID" .Docker.CurrentContainerID | first }}
+
+{{ define "proxy" }}
+  {{ if .Address }}
+    {{/* If we got the containers from swarm and this container's port is published to host, use host IP:PORT */}}
+    {{ if and .Container.Node.ID .Address.HostPort }}
+      # {{ .Container.Node.Name }}/{{ .Container.Name }}
+      proxy / {{ .Container.Node.Address.IP }}:{{ .Address.HostPort }} {
         header_upstream Host {host}
         header_upstream X-Real-IP {remote}
         header_upstream X-Forwarded-For {remote}
         header_upstream X-Forwarded-Proto {scheme}
       }
-      {{ end }}
-    {{ else if $value.Env.VIRTUAL_PORT }}
-      {{ range $i, $address := $value.Addresses }}
-        {{ if eq $address.Port $value.Env.VIRTUAL_PORT }}
-        proxy / {{ $address.IP }}:{{ $address.Port }} {
-          header_upstream Host {host}
-          header_upstream X-Real-IP {remote}
-          header_upstream X-Forwarded-For {remote}
-          header_upstream X-Forwarded-Proto {scheme}
-        }
-        {{ end }}
-      {{ end }}
-    {{ else }}
-      {{ range $i, $address := $value.Addresses }}
-        {{ if eq $address.Port "80" }}
-        proxy / {{ $address.IP }}:{{ $address.Port }} {
-          header_upstream Host {host}
-          header_upstream X-Real-IP {remote}
-          header_upstream X-Forwarded-For {remote}
-          header_upstream X-Forwarded-Proto {scheme}
-        }
+    {{/* If there is no swarm node or the port is not published on host, use container's IP:PORT */}}
+    {{ else if .Network }}
+      # {{ .Container.Name }}
+      proxy / {{ .Network.IP }}:{{ .Address.Port }} {
+        header_upstream Host {host}
+        header_upstream X-Real-IP {remote}
+        header_upstream X-Forwarded-For {remote}
+        header_upstream X-Forwarded-Proto {scheme}
+      }
+    {{ end }}
+  {{ end }}
+{{ end }}
+
+{{ range $host, $containers := groupByMulti $ "Env.VIRTUAL_HOST" "," }}
+{{ $host }} {
+  {{ range $index, $container := $containers }}
+    {{ $addrLen := len $container.Addresses }}
+    {{ $basicauth := $container.Env.BASIC_AUTH }}
+    {{ if $basicauth }}
+        basicauth {{ $basicauth }}
+    {{ end }}
+
+    {{ range $knownNetwork:= $CurrentContainer.Networks }}
+      {{ range $containerNetwork := $container.Networks }}
+        {{ if eq $knownNetwork.Name $containerNetwork.Name }}
+
+          {{/* If only 1 port exposed, use that */}}
+          {{ if eq $addrLen 1 }}
+            {{ $address := index $container.Addresses 0 }}
+            {{ template "proxy" (dict "Container" $container "Address" $address "Network" $containerNetwork) }}
+          {{ else }}
+            {{ $port := coalesce $container.Env.VIRTUAL_PORT "80" }}
+            {{ $address := where $container.Addresses "Port" $port | first }}
+            {{ template "proxy" (dict "Container" $container "Address" $address "Network" $containerNetwork) }}
+          {{ end }}
         {{ end }}
       {{ end }}
     {{ end }}
+
   {{ end }}
 }
 {{ end }}
+
