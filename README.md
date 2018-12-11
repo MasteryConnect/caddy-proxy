@@ -22,13 +22,13 @@ When you launch new (or stop) containers caddy-proxy will reload its configurati
 
 ### Additional Caddy http.proxy options
 
-There is support for adding additional options to [http.proxy](https://caddyserver.com/docs/proxy) using a technique similar to the one used by [caddy-docker-proxy](https://github.com/lucaslorentz/caddy-docker-proxy). Unlike [caddy-docker-proxy](https://github.com/lucaslorentz/caddy-docker-proxy), this project currently only supports options under [http.proxy](https://caddyserver.com/docs/proxy). An example would be adding 'websocket` proxying e.g.
+There is support for adding additional options to [http.proxy](https://caddyserver.com/docs/proxy) using a technique similar to the one used by [caddy-docker-proxy](https://github.com/lucaslorentz/caddy-docker-proxy). Unlike [caddy-docker-proxy](https://github.com/lucaslorentz/caddy-docker-proxy), currently this project only supports options under [http.proxy](https://caddyserver.com/docs/proxy). An example would be adding `websocket` proxying e.g.
 ```
 proxy /stream localhost:8080 {
   websocket
 }
 ```
-To do so, add a the following label
+To do so, add the following label
 ```sh
 $ docker run --label caddy.proxy.websocket="" -v /var/run/docker.sock:/tmp/docker.sock:ro -v /data/.caddy:/root/.caddy --name caddy-proxy -p 80:80 -p 443:443 -e CADDY_OPTIONS="--email youremail@example.com" -d masteryconnect/caddy-proxy:latest
 ```
