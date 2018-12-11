@@ -1,5 +1,14 @@
 {{ $CurrentContainer := where $ "ID" .Docker.CurrentContainerID | first }}
 
+{{ define "labels" }}
+  {{ $prefix := "caddy.proxy." }}
+  {{ range $key, $value := .Labels }}
+    {{ if hasPrefix $prefix $key }}
+      {{ "  " }}{{ trimPrefix $prefix $key }} {{ $value }}
+    {{ end }}
+  {{ end }}
+{{ end }}
+
 {{ define "proxy" }}
   {{ if .Address }}
     {{/* If we got the containers from swarm and this container's port is published to host, use host IP:PORT */}}
@@ -10,6 +19,7 @@
         header_upstream X-Real-IP {remote}
         header_upstream X-Forwarded-For {remote}
         header_upstream X-Forwarded-Proto {scheme}
+        {{ template "labels" (dict "Labels" .Container.Labels) }}
       }
     {{/* If there is no swarm node or the port is not published on host, use container's IP:PORT */}}
     {{ else if .Network }}
@@ -19,6 +29,7 @@
         header_upstream X-Real-IP {remote}
         header_upstream X-Forwarded-For {remote}
         header_upstream X-Forwarded-Proto {scheme}
+        {{ template "labels" (dict "Labels" .Container.Labels) }}
       }
     {{ end }}
   {{ end }}

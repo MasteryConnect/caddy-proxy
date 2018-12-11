@@ -1,0 +1,4 @@
+Caddyfile
+*.sh
+docker-gen
+*.tmpl
